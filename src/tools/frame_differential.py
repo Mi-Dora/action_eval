@@ -1,9 +1,11 @@
 import cv2
+import os
 import numpy as np
+import time
 import matplotlib.pyplot as plt
 
 
-def moving_detect(video_file):
+def get_static_frames_idx(video_file):
     mov_pix_vec = get_diff_pix_vec(video_file, interval=1)
     is_static = True
     static_frames_idx = []
@@ -21,7 +23,8 @@ def moving_detect(video_file):
                 arg = np.argsort(sliced)
                 static_frames_idx.append(arg[0]+begin)
                 begin = -1
-    plot_move_pix(mov_pix_vec, static_frames_idx, 'mov_pix3.png')
+    name = os.path.basename(video_file).split('.')[0] + '.png'
+    plot_move_pix(mov_pix_vec, static_frames_idx, '../../plots/' + name)
     return static_frames_idx
 
 
@@ -85,6 +88,8 @@ def plot_move_pix(mov_pix_vec, static_frames_idx, save_path='tmp.png'):
 
 
 if __name__ == '__main__':
-    video_file = "../sample/sample2.avi"
-    moving_detect(video_file)
+    begin = time.time()
+    video_file = "../../data/3.mp4"
+    get_static_frames_idx(video_file)
+    print('Video reading time for 926 frames is %.6f s' % (time.time() - begin))
 
