@@ -4,7 +4,50 @@ import cv2
 import csv
 import time
 import math
-from src.motion_detect import get_angle_vec
+import matplotlib.pyplot as plt
+from dtaidistance import dtw_ndim, dtw, dtw_ndim_visualisation, dtw_visualisation
+from src.tools.pose_angle import get_angle_vec
+
+
+def sequence_warping(input_seq, template):
+    distance, dtw_mat = dtw_ndim.warping_paths(input_seq, template)
+    path = dtw.best_path(dtw_mat)
+    # dtw_visualisation.plot_warping(input_seq, template, path1, filename='plot_warping1.png')
+
+    dtw_ndim_visualisation.plot_warping(input_seq, template, path, filename='plot_warping.png')
+    # path2 = dtw.best_path2(dtw_mat)
+
+    print(distance)
+    return distance, path
+
+
+def video_warping(input_video, template, path):
+    new_video = []
+    for step in path:
+        input_frame = input_video[step[0]]
+        template_frame = template[step[1]]
+        new_frame = np.concatenate((input_frame, template_frame), axis=1)
+        new_video.append(new_frame)
+    return new_video
+
+
+def plot_path(path, save_path):
+    src = []
+    template = []
+    for step in path:
+        src.append(step[0])
+        template.append((step[1]))
+    axis_max = max(path[-1][0], path[-1][1])
+    plt.xlim(0, axis_max)
+    plt.ylim(0, axis_max)
+    plt.plot(template, src)
+
+    # plt.plot(template, src, 'b^-')
+    plt.title('DTW Optimal Path')
+    plt.xlabel('Template')
+    plt.ylabel('Input Video')
+    plt.savefig(save_path)
+    plt.clf()
 
 
 def eval(pose_src, pose_ref, facial_feature=False, method='error', orient_weight=0.7):
@@ -26,8 +69,8 @@ def eval(pose_src, pose_ref, facial_feature=False, method='error', orient_weight
         header.append(key1)
         pose_src_array.append(pose_src[key1])
         pose_ref_array.append(pose_ref[key2])
-    pose_src_array = np.float32(pose_src_array)
-    pose_ref_array = np.float32(pose_ref_array)
+    pose_src_array = np.float64(pose_src_array)
+    pose_ref_array = np.float64(pose_ref_array)
     if method == 'error':
         return error_metrics(pose_src_array, pose_ref_array, header, orient_weight)
     elif method == 'angle':
