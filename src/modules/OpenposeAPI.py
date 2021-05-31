@@ -176,6 +176,7 @@ class OpenPoseEstimator(object):
             conf = multi_pose[person, :, 2].sum()
             if conf > max_conf:
                 prior = person
+                max_conf = conf
         if prior != -1:
             return multi_pose[np.newaxis, prior, :, :]
         else:

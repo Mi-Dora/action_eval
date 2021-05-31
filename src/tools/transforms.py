@@ -100,7 +100,7 @@ def transform_pose(mat, src_pose):
     for key in src_pose.keys():
         src_coor = np.float64([[src_pose[key][0]], [src_pose[key][1]], [1]])
         dst_coor = mat.dot(src_coor)
-        dst_pose[key] = (dst_coor[0, 0], dst_coor[1, 0])
+        dst_pose[key] = (dst_coor[0, 0 ], dst_coor[1, 0])
     return dst_pose
 
 

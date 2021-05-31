@@ -2,26 +2,47 @@ import numpy as np
 import cv2
 import os
 import time
+import json
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 from src.tools.utils import openpose_header, plot_skeleton
 
+vector_set = [
+    ['left_elbow', 'left_wrist', 'left_shoulder', 'left_elbow'],
+    ['right_shoulder', 'right_elbow', 'right_elbow', 'right_wrist'],
+    ['left_shoulder', 'left_hip', 'left_shoulder', 'left_elbow'],
+    ['right_shoulder', 'right_elbow', 'right_shoulder', 'right_hip'],
+    ['left_hip', 'right_hip', 'left_hip', 'left_knee'],
+    ['right_hip', 'right_knee', 'right_hip', 'left_hip'],
+    ['left_knee', 'left_ankle', 'left_hip', 'left_knee'],
+    ['right_hip', 'right_knee', 'right_knee', 'right_ankle'],
+    ['neck', 'nose', 'left_shoulder', 'right_shoulder']
+]
+feature_len = len(vector_set)
 
-def get_video_angle_vec(pose_array_list):
+
+
+def get_video_angle_vec(pose_array_list, action_class=None):
     """
-    :param video_file: video file name or camera id (e.g. 0)
+    :param pose_array_list:
+    :param action_class:
     :return: list of static frames
     """
     # Open the input movie file
     # angle method
-
-    cnt = 0
+    mask = np.ones(feature_len)
+    if action_class is not None:
+        f = open(os.path.split(os.path.realpath(__file__))[0] + '/../../config/action_class_mask.json', 'r')
+        content = f.read()
+        action_cfg = json.loads(content)
+        mask = np.array(action_cfg[action_class])
+        f.close()
     angle_vecs = []
     error_vecs = []
     frame_list = []
     for pose in pose_array_list:
-        # pose(1, 18, 3) pose[0] (18, 3)
-        angle_vec = get_angle_vec(pose[0], openpose_header)
+
+        angle_vec = get_angle_vec(pose, openpose_header)
 
         # # get rid of abnormal value
         # if len(angle_vecs) != 0:
@@ -37,24 +58,13 @@ def get_video_angle_vec(pose_array_list):
         angle_vecs.append(angle_vec)
 
     angle_vecs = np.float32(angle_vecs)
-    angle_vecs = column_smooth(angle_vecs)
-    return angle_vecs
+    # angle_vecs = column_smooth(angle_vecs)
+    return angle_vecs, mask
 
 
 def get_angle_vec(pose_array, header):
     # b_pt1, e_pt1, b_pt2, e_pt2
     # anti-clockwise
-    vector_set = [
-        ['left_elbow', 'left_wrist', 'left_shoulder', 'left_elbow'],
-        ['right_shoulder', 'right_elbow', 'right_elbow', 'right_wrist'],
-        ['left_shoulder', 'left_hip', 'left_shoulder', 'left_elbow'],
-        ['right_shoulder', 'right_elbow', 'right_shoulder', 'right_hip'],
-        ['left_hip', 'right_hip', 'left_hip', 'left_knee'],
-        ['right_hip', 'right_knee', 'right_hip', 'left_hip'],
-        ['left_knee', 'left_ankle', 'left_hip', 'left_knee'],
-        ['right_hip', 'right_knee', 'right_knee', 'right_ankle'],
-        ['neck', 'nose', 'left_shoulder', 'right_shoulder']
-    ]
 
     angle_vec = []
 
@@ -74,7 +84,7 @@ def cal_angle(b_pt1, e_pt1, b_pt2, e_pt2):
     :param e_pt1: (ndarray) end point 1 [x, y]
     :param b_pt2: (ndarray) begin point 2 [x, y]
     :param e_pt2: (ndarray) end point 2 [x, y]
-    :return: (float 0~2*pi) angle from vector1 to vector2 (anticlockwise rad)
+    :return: (float -pi~pi) angle from vector1 to vector2 (anticlockwise rad)
     """
     vec1 = e_pt1 - b_pt1
     vec2 = e_pt2 - b_pt2
@@ -107,8 +117,9 @@ def column_smooth(arrays):
     return np.float32(np.transpose(smoothed))
 
 
-def plot_angle_curve(angle_vecs, static_frames_idx=None, save_path='tmp.png'):
-    plt.title('Joint Angle Sequence')
+def plot_angle_curve(angle_vecs, static_frames_idx=None, save_path='tmp.png', name=''):
+    plt.figure(figsize=(6, 4))
+    plt.title(name)
     plt.plot(angle_vecs[:, 0], color='green', label='left elbow')
     plt.plot(angle_vecs[:, 1], color='red', label='right elbow')
     plt.plot(angle_vecs[:, 2], color='skyblue', label='left shoulder')
@@ -122,6 +133,29 @@ def plot_angle_curve(angle_vecs, static_frames_idx=None, save_path='tmp.png'):
     if static_frames_idx is not None:
         for idx in static_frames_idx:
             plt.vlines(idx, -np.pi/2, 3*np.pi/2, colors="r", linestyles="dashed")
+    plt.xlabel('Frame ID')
+    plt.ylabel('Angle (rad)')
+    plt.show()
+    # plt.savefig(save_path)
+    plt.clf()
+
+
+def plot_angle_curve_seg(angle_vecs, segments, save_path='tmp.png'):
+    plt.title('Joint Angle Sequence')
+    plt.plot(angle_vecs[:, 0], color='green', label='left elbow')
+    plt.plot(angle_vecs[:, 1], color='red', label='right elbow')
+    plt.plot(angle_vecs[:, 2], color='skyblue', label='left shoulder')
+    plt.plot(angle_vecs[:, 3], color='blue', label='right shoulder')
+    plt.plot(angle_vecs[:, 4], label='left hip')
+    plt.plot(angle_vecs[:, 5], label='right hip')
+    plt.plot(angle_vecs[:, 6], label='left knee')
+    plt.plot(angle_vecs[:, 7], label='right knee')
+    plt.plot(angle_vecs[:, 8], label='head')
+    plt.legend(loc='upper left')  # 显示图例
+    for segment in segments:
+        plt.vlines(segment[0], -np.pi, np.pi, colors="r", linestyles="dashed")
+        plt.vlines(segment[1], -np.pi, np.pi, colors="g", linestyles="dashed")
+    plt.vlines(segments[-1][2], -np.pi, np.pi, colors="r", linestyles="dashed")
     plt.xlabel('Frame ID')
     plt.ylabel('Angle (rad)')
     plt.savefig(save_path)
